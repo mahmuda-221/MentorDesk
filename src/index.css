@@ -109,3 +109,90 @@ code {
   padding: 4px 8px;
   background: var(--code-bg);
 }
+
+/* Submit Question Form */
+
+.question-form {
+  background: #ffffff;
+  padding: 28px;
+  border-radius: 14px;
+  border: 1px solid #e8eaf0;
+  max-width: 850px;
+  margin-top: 24px;
+}
+
+.question-form .form-group {
+  margin-bottom: 22px;
+}
+
+.question-form label {
+  display: block;
+  font-size: 14px;
+  font-weight: 600;
+  color: #263247;
+  margin-bottom: 9px;
+}
+
+.question-form input,
+.question-form select,
+.question-form textarea {
+  width: 100%;
+  padding: 13px 15px;
+  border: 1px solid #dce1e9;
+  border-radius: 8px;
+  font-size: 14px;
+  font-family: inherit;
+  color: #263247;
+  background: #ffffff;
+  outline: none;
+  box-sizing: border-box;
+  transition: border-color 0.2s, box-shadow 0.2s;
+}
+
+.question-form input:focus,
+.question-form select:focus,
+.question-form textarea:focus {
+  border-color: #6955d9;
+  box-shadow: 0 0 0 3px rgba(105, 85, 217, 0.12);
+}
+
+.question-form textarea {
+  resize: vertical;
+  min-height: 140px;
+}
+
+.question-form-actions {
+  display: flex;
+  justify-content: flex-end;
+  gap: 12px;
+  margin-top: 28px;
+}
+
+.secondary-button {
+  padding: 12px 22px;
+  border: 1px solid #dce1e9;
+  border-radius: 8px;
+  background: #ffffff;
+  color: #475467;
+  font-size: 14px;
+  font-weight: 600;
+  cursor: pointer;
+}
+
+.secondary-button:hover {
+  background: #f5f6fa;
+}
+
+@media (max-width: 600px) {
+  .question-form {
+    padding: 18px;
+  }
+
+  .question-form-actions {
+    flex-direction: column-reverse;
+  }
+
+  .question-form-actions button {
+    width: 100%;
+  }
+}
