@@ -8,6 +8,11 @@ function App() {
   const [currentPage, setCurrentPage] = useState('auth')
   const [selectedQuestion, setSelectedQuestion] = useState(null)
 
+  // Search and filter states
+  const [searchTerm, setSearchTerm] = useState('')
+  const [statusFilter, setStatusFilter] = useState('All')
+  const [categoryFilter, setCategoryFilter] = useState('All')
+
   const [questions, setQuestions] = useState([
     {
       id: 1,
@@ -50,7 +55,6 @@ function App() {
     event.preventDefault()
 
     const formData = new FormData(event.currentTarget)
-    const email = formData.get('email')
     const password = formData.get('password')
 
     if (isSignUp) {
@@ -102,6 +106,10 @@ function App() {
 
     event.currentTarget.reset()
     setCurrentPage('dashboard')
+    setSearchTerm('')
+    setStatusFilter('All')
+    setCategoryFilter('All')
+
     alert('Your question has been submitted successfully!')
   }
 
@@ -141,52 +149,171 @@ function App() {
     )
   }
 
-  const renderQuestions = () => (
-    <div className="question-table">
-      <div className="table-row table-header">
-        <span>QUESTION</span>
-        <span>CATEGORY</span>
-        <span>DATE</span>
-        <span>STATUS</span>
-      </div>
+  // Reset all filters
+  const clearFilters = () => {
+    setSearchTerm('')
+    setStatusFilter('All')
+    setCategoryFilter('All')
+  }
 
-      {questions.map((question) => (
-        <div
-          className="table-row clickable-row"
-          key={question.id}
-          role="button"
-          tabIndex={0}
-          onClick={() => openQuestionDetails(question)}
-          onKeyDown={(event) => {
-            if (event.key === 'Enter' || event.key === ' ') {
-              event.preventDefault()
-              openQuestionDetails(question)
-            }
+  // Search and filter questions
+  const filteredQuestions = questions.filter((question) => {
+    const search = searchTerm.toLowerCase().trim()
+
+    const matchesSearch =
+      question.title.toLowerCase().includes(search) ||
+      question.description.toLowerCase().includes(search) ||
+      question.category.toLowerCase().includes(search)
+
+    const matchesStatus =
+      statusFilter === 'All' || question.status === statusFilter
+
+    const matchesCategory =
+      categoryFilter === 'All' ||
+      question.category === categoryFilter
+
+    return matchesSearch && matchesStatus && matchesCategory
+  })
+
+  const renderQuestions = () => (
+    <>
+      {/* SEARCH AND FILTER SECTION */}
+      <div
+        className="question-filters"
+        style={{
+          display: 'flex',
+          flexWrap: 'wrap',
+          gap: '12px',
+          alignItems: 'center',
+          marginBottom: '20px',
+          padding: '16px',
+          background: '#ffffff',
+          border: '1px solid #e5e7eb',
+          borderRadius: '12px',
+        }}
+      >
+        <input
+          type="search"
+          value={searchTerm}
+          onChange={(event) => setSearchTerm(event.target.value)}
+          placeholder="Search questions..."
+          aria-label="Search questions"
+          style={{
+            flex: '2 1 220px',
+            minWidth: '180px',
+            padding: '12px 14px',
+            border: '1px solid #d1d5db',
+            borderRadius: '8px',
+            outline: 'none',
+            fontSize: '14px',
+          }}
+        />
+
+        <select
+          value={statusFilter}
+          onChange={(event) => setStatusFilter(event.target.value)}
+          aria-label="Filter by status"
+          style={{
+            flex: '1 1 150px',
+            padding: '12px',
+            border: '1px solid #d1d5db',
+            borderRadius: '8px',
+            background: '#ffffff',
+            fontSize: '14px',
           }}
         >
-          <strong>{question.title}</strong>
-          <span>{question.category}</span>
-          <span>{question.date}</span>
+          <option value="All">All Statuses</option>
+          <option value="Open">Open</option>
+          <option value="In Review">In Review</option>
+          <option value="Answered">Answered</option>
+          <option value="Resolved">Resolved</option>
+        </select>
 
-          <span
-            className={`status ${
-              question.status === 'Answered' ||
-              question.status === 'Resolved'
-                ? 'answered'
-                : question.status === 'In Review'
-                  ? 'review'
-                  : 'open'
-            }`}
-          >
-            {question.status}
-          </span>
+        <select
+          value={categoryFilter}
+          onChange={(event) => setCategoryFilter(event.target.value)}
+          aria-label="Filter by category"
+          style={{
+            flex: '1 1 150px',
+            padding: '12px',
+            border: '1px solid #d1d5db',
+            borderRadius: '8px',
+            background: '#ffffff',
+            fontSize: '14px',
+          }}
+        >
+          <option value="All">All Categories</option>
+          {[...new Set(questions.map((q) => q.category))].map(
+            (category) => (
+              <option key={category} value={category}>
+                {category}
+              </option>
+            )
+          )}
+        </select>
+
+        <button
+          type="button"
+          className="secondary-button"
+          onClick={clearFilters}
+        >
+          Clear Filters
+        </button>
+      </div>
+
+      <p style={{ marginBottom: '14px', color: '#64748b', fontSize: '14px' }}>
+        Showing {filteredQuestions.length} of {questions.length} questions
+      </p>
+
+      {/* QUESTION TABLE */}
+      <div className="question-table">
+        <div className="table-row table-header">
+          <span>QUESTION</span>
+          <span>CATEGORY</span>
+          <span>DATE</span>
+          <span>STATUS</span>
         </div>
-      ))}
 
-      {questions.length === 0 && (
-        <p className="empty-message">No questions available yet.</p>
-      )}
-    </div>
+        {filteredQuestions.map((question) => (
+          <div
+            className="table-row clickable-row"
+            key={question.id}
+            role="button"
+            tabIndex={0}
+            onClick={() => openQuestionDetails(question)}
+            onKeyDown={(event) => {
+              if (event.key === 'Enter' || event.key === ' ') {
+                event.preventDefault()
+                openQuestionDetails(question)
+              }
+            }}
+          >
+            <strong>{question.title}</strong>
+            <span>{question.category}</span>
+            <span>{question.date}</span>
+
+            <span
+              className={`status ${
+                question.status === 'Answered' ||
+                question.status === 'Resolved'
+                  ? 'answered'
+                  : question.status === 'In Review'
+                    ? 'review'
+                    : 'open'
+              }`}
+            >
+              {question.status}
+            </span>
+          </div>
+        ))}
+
+        {filteredQuestions.length === 0 && (
+          <p className="empty-message">
+            No matching questions found. Try changing your search or filters.
+          </p>
+        )}
+      </div>
+    </>
   )
 
   if (currentPage !== 'auth') {
@@ -284,6 +411,7 @@ function App() {
               onClick={() => {
                 setCurrentPage('auth')
                 setSelectedQuestion(null)
+                clearFilters()
               }}
             >
               ↪ Log Out
@@ -437,7 +565,7 @@ function App() {
                   <div>
                     <h2>All Intern Questions</h2>
                     <p>
-                      Select a question to review and submit your response.
+                      Search, filter, and select a question to respond.
                     </p>
                   </div>
                 </div>
