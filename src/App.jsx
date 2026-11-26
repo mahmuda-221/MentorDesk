@@ -140,6 +140,29 @@ function App() {
     alert('Your question has been submitted successfully!')
   }
 
+  // Delete a question from the list and localStorage.
+  const handleDeleteQuestion = (questionId) => {
+    const questionToDelete = questions.find(
+      (question) => question.id === questionId
+    )
+
+    if (!questionToDelete) return
+
+    const shouldDelete = window.confirm(
+      `Are you sure you want to delete "${questionToDelete.title}"? This action cannot be undone.`
+    )
+
+    if (!shouldDelete) return
+
+    setQuestions((previousQuestions) =>
+      previousQuestions.filter((question) => question.id !== questionId)
+    )
+    setSelectedQuestion(null)
+    clearFilters()
+    setCurrentPage('myQuestions')
+    alert('Your question has been deleted successfully!')
+  }
+
   const handleMentorResponse = (event) => {
     event.preventDefault()
 
@@ -705,12 +728,29 @@ function App() {
                   </p>
                 </div>
 
-                <button
-                  className="secondary-button"
-                  onClick={goToRoleDashboard}
-                >
-                  ← Back to Dashboard
-                </button>
+                <div style={{ display: 'flex', gap: '10px', flexWrap: 'wrap' }}>
+                  {!isMentor && (
+                    <button
+                      type="button"
+                      className="secondary-button"
+                      onClick={() => handleDeleteQuestion(selectedQuestion.id)}
+                      style={{
+                        color: '#dc2626',
+                        borderColor: '#fecaca',
+                        background: '#fef2f2',
+                      }}
+                    >
+                      Delete Question
+                    </button>
+                  )}
+
+                  <button
+                    className="secondary-button"
+                    onClick={goToRoleDashboard}
+                  >
+                    ← Back to Dashboard
+                  </button>
+                </div>
               </div>
 
               <div className="question-details-card">
