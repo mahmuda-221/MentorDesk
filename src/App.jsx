@@ -1,3 +1,4 @@
+
 import { useEffect, useState } from 'react'
 import './App.css'
 
@@ -11,16 +12,33 @@ function App() {
   const [statusFilter, setStatusFilter] = useState('All')
   const [categoryFilter, setCategoryFilter] = useState('All')
 
+  // Notification states
+  const [notifications, setNotifications] = useState(() => {
+    try {
+      const saved = localStorage.getItem('mentorDeskNotifications')
+      return saved ? JSON.parse(saved) : []
+    } catch (error) {
+      console.error('Could not load notifications:', error)
+      return []
+    }
+  })
+
+  const [isNotificationOpen, setIsNotificationOpen] = useState(false)
+
+  // Load questions from LocalStorage
   const [questions, setQuestions] = useState(() => {
     try {
       const savedQuestions = localStorage.getItem('mentorDeskQuestions')
+
       if (savedQuestions) {
         const parsedQuestions = JSON.parse(savedQuestions)
+
         if (Array.isArray(parsedQuestions)) {
-          // Ensure older saved questions also support discussion comments.
           return parsedQuestions.map((question) => ({
             ...question,
-            comments: Array.isArray(question.comments) ? question.comments : [],
+            comments: Array.isArray(question.comments)
+              ? question.comments
+              : [],
           }))
         }
       }
@@ -70,43 +88,135 @@ function App() {
     ]
   })
 
+  // Save questions
   useEffect(() => {
     try {
-      localStorage.setItem('mentorDeskQuestions', JSON.stringify(questions))
+      localStorage.setItem(
+        'mentorDeskQuestions',
+        JSON.stringify(questions)
+      )
     } catch (error) {
       console.error('Could not save questions:', error)
     }
   }, [questions])
 
+  // Save notifications
+  useEffect(() => {
+    try {
+      localStorage.setItem(
+        'mentorDeskNotifications',
+        JSON.stringify(notifications)
+      )
+    } catch (error) {
+      console.error('Could not save notifications:', error)
+    }
+  }, [notifications])
+
+  // Create notification
+  const addNotification = (targetRole, message, questionId) => {
+    const newNotification = {
+      id: Date.now(),
+      targetRole,
+      message,
+      questionId,
+      date: new Date().toLocaleString('en-US', {
+        month: 'short',
+        day: '2-digit',
+        year: 'numeric',
+        hour: '2-digit',
+        minute: '2-digit',
+      }),
+      read: false,
+    }
+
+    setNotifications((previous) => [
+      newNotification,
+      ...previous,
+    ])
+  }
+
+  // Clear filters
   const clearFilters = () => {
     setSearchTerm('')
     setStatusFilter('All')
     setCategoryFilter('All')
   }
 
+  // Unread notifications for current role
+  const roleNotifications = notifications.filter(
+    (notification) => notification.targetRole === role
+  )
+
+  const unreadNotifications = roleNotifications.filter(
+    (notification) => !notification.read
+  )
+
+  // Mark one notification as read and open its question
+  const handleNotificationClick = (notification) => {
+    setNotifications((previous) =>
+      previous.map((item) =>
+        item.id === notification.id
+          ? { ...item, read: true }
+          : item
+      )
+    )
+
+    setIsNotificationOpen(false)
+
+    const question = questions.find(
+      (item) => item.id === notification.questionId
+    )
+
+    if (question) {
+      openQuestionDetails(question)
+    } else {
+      alert('This question is no longer available.')
+    }
+  }
+
+  // Mark all notifications as read
+  const handleMarkAllRead = () => {
+    setNotifications((previous) =>
+      previous.map((notification) =>
+        notification.targetRole === role
+          ? { ...notification, read: true }
+          : notification
+      )
+    )
+  }
+
+  // Login and signup
   const handleSubmit = (event) => {
     event.preventDefault()
+
     const formData = new FormData(event.currentTarget)
     const password = formData.get('password')
 
     if (isSignUp) {
       const name = formData.get('name')
       const confirmPassword = formData.get('confirmPassword')
+
       if (password !== confirmPassword) {
         alert('Passwords do not match!')
         return
       }
+
       alert(`Demo account created successfully for ${name}!`)
       setIsSignUp(false)
       return
     }
 
-    setCurrentPage(role === 'Intern' ? 'dashboard' : 'mentorDashboard')
+    setCurrentPage(
+      role === 'Intern' ? 'dashboard' : 'mentorDashboard'
+    )
   }
 
+  // Submit a new question
   const handleQuestionSubmit = (event) => {
     event.preventDefault()
+
     const formData = new FormData(event.currentTarget)
+
     const newQuestion = {
       id: Date.now(),
       title: formData.get('title').trim(),
@@ -124,36 +234,61 @@ function App() {
       comments: [],
     }
 
-    setQuestions((previousQuestions) => [newQuestion, ...previousQuestions])
+    setQuestions((previous) => [
+      newQuestion,
+      ...previous,
+    ])
+
+    // Notify Mentor
+    addNotification(
+      'Mentor',
+      `New question submitted: ${newQuestion.title}`,
+      newQuestion.id
+    )
+
     event.currentTarget.reset()
     setCurrentPage('dashboard')
     clearFilters()
+
     alert('Your question has been submitted successfully!')
   }
 
+  // Delete question
   const handleDeleteQuestion = (questionId) => {
-    const questionToDelete = questions.find((question) => question.id === questionId)
+    const questionToDelete = questions.find(
+      (question) => question.id === questionId
+    )
+
     if (!questionToDelete) return
 
     const shouldDelete = window.confirm(
       `Are you sure you want to delete "${questionToDelete.title}"? This action cannot be undone.`
     )
+
     if (!shouldDelete) return
 
-    setQuestions((previousQuestions) =>
-      previousQuestions.filter((question) => question.id !== questionId)
+    setQuestions((previous) =>
+      previous.filter((question) => question.id !== questionId)
     )
+
     setSelectedQuestion(null)
     clearFilters()
     setCurrentPage('myQuestions')
+
     alert('Your question has been deleted successfully!')
   }
 
-  const handleStartEditQuestion = () => setIsEditingQuestion(true)
+  // Start editing question
+  const handleStartEditQuestion = () => {
+    setIsEditingQuestion(true)
+  }
 
+  // Save edited question
   const handleEditQuestionSubmit = (event) => {
     event.preventDefault()
+
     const formData = new FormData(event.currentTarget)
+
     const updatedQuestion = {
       ...selectedQuestion,
       title: formData.get('title').trim(),
@@ -161,19 +296,26 @@ function App() {
       description: formData.get('description').trim(),
     }
 
-    setQuestions((previousQuestions) =>
-      previousQuestions.map((question) =>
-        question.id === updatedQuestion.id ? updatedQuestion : question
+    setQuestions((previous) =>
+      previous.map((question) =>
+        question.id === updatedQuestion.id
+          ? updatedQuestion
+          : question
       )
     )
+
     setSelectedQuestion(updatedQuestion)
     setIsEditingQuestion(false)
+
     alert('Your question has been updated successfully!')
   }
 
+  // Mentor submits response
   const handleMentorResponse = (event) => {
     event.preventDefault()
+
     const formData = new FormData(event.currentTarget)
+
     const updatedQuestion = {
       ...selectedQuestion,
       answer: formData.get('answer').trim(),
@@ -182,48 +324,74 @@ function App() {
       mentor: 'Demo Mentor',
     }
 
-    setQuestions((previousQuestions) =>
-      previousQuestions.map((question) =>
-        question.id === updatedQuestion.id ? updatedQuestion : question
+    setQuestions((previous) =>
+      previous.map((question) =>
+        question.id === updatedQuestion.id
+          ? updatedQuestion
+          : question
       )
     )
+
     setSelectedQuestion(updatedQuestion)
+
+    // Notify Intern
+    addNotification(
+      'Intern',
+      `Your mentor responded to: ${updatedQuestion.title}`,
+      updatedQuestion.id
+    )
+
     alert('Your response has been submitted successfully!')
   }
 
+  // Mark question as resolved
   const handleMarkAsResolved = () => {
     if (!selectedQuestion || !selectedQuestion.answer) return
     if (selectedQuestion.status === 'Resolved') return
 
-    if (
-      !window.confirm(
-        'Have you reviewed the mentor answer? Mark this question as resolved?'
-      )
-    ) return
+    const shouldResolve = window.confirm(
+      'Have you reviewed the mentor answer? Mark this question as resolved?'
+    )
 
-    const updatedQuestion = { ...selectedQuestion, status: 'Resolved' }
-    setQuestions((previousQuestions) =>
-      previousQuestions.map((question) =>
-        question.id === updatedQuestion.id ? updatedQuestion : question
+    if (!shouldResolve) return
+
+    const updatedQuestion = {
+      ...selectedQuestion,
+      status: 'Resolved',
+    }
+
+    setQuestions((previous) =>
+      previous.map((question) =>
+        question.id === updatedQuestion.id
+          ? updatedQuestion
+          : question
       )
     )
+
     setSelectedQuestion(updatedQuestion)
+
     alert('Question marked as resolved successfully!')
   }
 
-  // Interns and mentors can both add comments to the same question.
+  // Add follow-up comment
   const handleAddComment = (event) => {
     event.preventDefault()
+
     if (!selectedQuestion) return
 
     const formData = new FormData(event.currentTarget)
-    const commentText = String(formData.get('comment') || '').trim()
+    const commentText = String(
+      formData.get('comment') || ''
+    ).trim()
+
     if (!commentText) return
 
     const newComment = {
       id: Date.now(),
       text: commentText,
-      author: role === 'Mentor' ? 'Demo Mentor' : 'Intern User',
+      author: role === 'Mentor'
+        ? 'Demo Mentor'
+        : 'Intern User',
       role,
       date: new Date().toLocaleString('en-US', {
         month: 'short',
@@ -236,44 +404,84 @@ function App() {
 
     const updatedQuestion = {
       ...selectedQuestion,
-      comments: [...(selectedQuestion.comments || []), newComment],
+      comments: [
+        ...(selectedQuestion.comments || []),
+        newComment,
+      ],
     }
 
-    setQuestions((previousQuestions) =>
-      previousQuestions.map((question) =>
-        question.id === updatedQuestion.id ? updatedQuestion : question
+    setQuestions((previous) =>
+      previous.map((question) =>
+        question.id === updatedQuestion.id
+          ? updatedQuestion
+          : question
       )
     )
+
     setSelectedQuestion(updatedQuestion)
+
+    // Notify the opposite role
+    addNotification(
+      role === 'Intern' ? 'Mentor' : 'Intern',
+      `${newComment.author} added a comment on: ${updatedQuestion.title}`,
+      updatedQuestion.id
+    )
+
     event.currentTarget.reset()
   }
 
+  // Open question details
   const openQuestionDetails = (question) => {
-    const latestQuestion = questions.find((item) => item.id === question.id) || question
+    const latestQuestion =
+      questions.find((item) => item.id === question.id) || question
+
     setSelectedQuestion({
       ...latestQuestion,
-      comments: Array.isArray(latestQuestion.comments) ? latestQuestion.comments : [],
+      comments: Array.isArray(latestQuestion.comments)
+        ? latestQuestion.comments
+        : [],
     })
+
     setIsEditingQuestion(false)
     setCurrentPage('details')
   }
 
+  // Back to dashboard
   const goToRoleDashboard = () => {
     setIsEditingQuestion(false)
-    setCurrentPage(role === 'Mentor' ? 'mentorDashboard' : 'dashboard')
+
+    setCurrentPage(
+      role === 'Mentor'
+        ? 'mentorDashboard'
+        : 'dashboard'
+    )
   }
 
+  // Search and filter
   const filteredQuestions = questions.filter((question) => {
     const search = searchTerm.toLowerCase().trim()
+
     const matchesSearch =
       question.title.toLowerCase().includes(search) ||
       question.description.toLowerCase().includes(search) ||
       question.category.toLowerCase().includes(search)
-    const matchesStatus = statusFilter === 'All' || question.status === statusFilter
-    const matchesCategory = categoryFilter === 'All' || question.category === categoryFilter
-    return matchesSearch && matchesStatus && matchesCategory
+
+    const matchesStatus =
+      statusFilter === 'All' ||
+      question.status === statusFilter
+
+    const matchesCategory =
+      categoryFilter === 'All' ||
+      question.category === categoryFilter
+
+    return (
+      matchesSearch &&
+      matchesStatus &&
+      matchesCategory
+    )
   })
 
+  // Question list and filters
   const renderQuestions = () => (
     <>
       <div
@@ -293,7 +501,9 @@ function App() {
         <input
           type="search"
           value={searchTerm}
-          onChange={(event) => setSearchTerm(event.target.value)}
+          onChange={(event) =>
+            setSearchTerm(event.target.value)
+          }
           placeholder="Search questions..."
           aria-label="Search questions"
           style={{
@@ -309,7 +519,9 @@ function App() {
 
         <select
           value={statusFilter}
-          onChange={(event) => setStatusFilter(event.target.value)}
+          onChange={(event) =>
+            setStatusFilter(event.target.value)
+          }
           aria-label="Filter by status"
           style={{
             flex: '1 1 150px',
@@ -329,7 +541,9 @@ function App() {
 
         <select
           value={categoryFilter}
-          onChange={(event) => setCategoryFilter(event.target.value)}
+          onChange={(event) =>
+            setCategoryFilter(event.target.value)
+          }
           aria-label="Filter by category"
           style={{
             flex: '1 1 150px',
@@ -341,17 +555,34 @@ function App() {
           }}
         >
           <option value="All">All Categories</option>
-          {[...new Set(questions.map((question) => question.category))].map((category) => (
-            <option key={category} value={category}>{category}</option>
+
+          {[
+            ...new Set(
+              questions.map((question) => question.category)
+            ),
+          ].map((category) => (
+            <option key={category} value={category}>
+              {category}
+            </option>
           ))}
         </select>
 
-        <button type="button" className="secondary-button" onClick={clearFilters}>
+        <button
+          type="button"
+          className="secondary-button"
+          onClick={clearFilters}
+        >
           Clear Filters
         </button>
       </div>
 
-      <p style={{ marginBottom: '14px', color: '#64748b', fontSize: '14px' }}>
+      <p
+        style={{
+          marginBottom: '14px',
+          color: '#64748b',
+          fontSize: '14px',
+        }}
+      >
         Showing {filteredQuestions.length} of {questions.length} questions
       </p>
 
@@ -371,7 +602,10 @@ function App() {
             tabIndex={0}
             onClick={() => openQuestionDetails(question)}
             onKeyDown={(event) => {
-              if (event.key === 'Enter' || event.key === ' ') {
+              if (
+                event.key === 'Enter' ||
+                event.key === ' '
+              ) {
                 event.preventDefault()
                 openQuestionDetails(question)
               }
@@ -380,9 +614,11 @@ function App() {
             <strong>{question.title}</strong>
             <span>{question.category}</span>
             <span>{question.date}</span>
+
             <span
               className={`status ${
-                question.status === 'Answered' || question.status === 'Resolved'
+                question.status === 'Answered' ||
+                question.status === 'Resolved'
                   ? 'answered'
                   : question.status === 'In Review'
                     ? 'review'
@@ -403,8 +639,10 @@ function App() {
     </>
   )
 
+  // Dashboard pages
   if (currentPage !== 'auth') {
     const isMentor = role === 'Mentor'
+
     const pageTitle =
       currentPage === 'dashboard'
         ? 'Dashboard'
@@ -440,29 +678,43 @@ function App() {
           {isMentor ? (
             <button
               className={`menu-item ${
-                currentPage === 'mentorDashboard' || currentPage === 'details' ? 'active' : ''
+                currentPage === 'mentorDashboard' ||
+                currentPage === 'details'
+                  ? 'active'
+                  : ''
               }`}
-              onClick={() => setCurrentPage('mentorDashboard')}
+              onClick={() =>
+                setCurrentPage('mentorDashboard')
+              }
             >
               <span>▦</span> Dashboard
             </button>
           ) : (
             <>
               <button
-                className={`menu-item ${currentPage === 'dashboard' ? 'active' : ''}`}
+                className={`menu-item ${
+                  currentPage === 'dashboard' ? 'active' : ''
+                }`}
                 onClick={() => setCurrentPage('dashboard')}
               >
                 <span>▦</span> Dashboard
               </button>
+
               <button
-                className={`menu-item ${currentPage === 'submit' ? 'active' : ''}`}
+                className={`menu-item ${
+                  currentPage === 'submit' ? 'active' : ''
+                }`}
                 onClick={() => setCurrentPage('submit')}
               >
                 <span>＋</span> Submit Question
               </button>
+
               <button
                 className={`menu-item ${
-                  currentPage === 'myQuestions' || currentPage === 'details' ? 'active' : ''
+                  currentPage === 'myQuestions' ||
+                  currentPage === 'details'
+                    ? 'active'
+                    : ''
                 }`}
                 onClick={() => setCurrentPage('myQuestions')}
               >
@@ -473,17 +725,24 @@ function App() {
 
           <div className="sidebar-bottom">
             <div className="profile-mini">
-              <div className="avatar">{isMentor ? 'M' : 'I'}</div>
+              <div className="avatar">
+                {isMentor ? 'M' : 'I'}
+              </div>
+
               <div>
-                <strong>{isMentor ? 'Demo Mentor' : 'Intern User'}</strong>
+                <strong>
+                  {isMentor ? 'Demo Mentor' : 'Intern User'}
+                </strong>
                 <small>{role}</small>
               </div>
             </div>
+
             <button
               className="logout-button"
               onClick={() => {
                 setCurrentPage('auth')
                 setSelectedQuestion(null)
+                setIsNotificationOpen(false)
                 clearFilters()
               }}
             >
@@ -498,9 +757,218 @@ function App() {
               <h1>{pageTitle}</h1>
               <p>{pageDescription}</p>
             </div>
-            <div className="header-profile">
-              <div className="avatar">{isMentor ? 'M' : 'I'}</div>
-              <span>{isMentor ? 'Demo Mentor' : 'Intern User'}</span>
+
+            <div
+              style={{
+                display: 'flex',
+                alignItems: 'center',
+                gap: '18px',
+              }}
+            >
+              {/* Notification Bell */}
+              <div
+                style={{
+                  position: 'relative',
+                }}
+              >
+                <button
+                  type="button"
+                  onClick={() =>
+                    setIsNotificationOpen((previous) => !previous)
+                  }
+                  aria-label="Notifications"
+                  style={{
+                    position: 'relative',
+                    border: '1px solid #e2e8f0',
+                    background: '#ffffff',
+                    borderRadius: '10px',
+                    width: '44px',
+                    height: '44px',
+                    fontSize: '21px',
+                    cursor: 'pointer',
+                  }}
+                >
+                  🔔
+
+                  {unreadNotifications.length > 0 && (
+                    <span
+                      style={{
+                        position: 'absolute',
+                        top: '-7px',
+                        right: '-7px',
+                        minWidth: '19px',
+                        height: '19px',
+                        padding: '0 5px',
+                        borderRadius: '20px',
+                        background: '#ef4444',
+                        color: '#ffffff',
+                        fontSize: '11px',
+                        fontWeight: 700,
+                        display: 'flex',
+                        alignItems: 'center',
+                        justifyContent: 'center',
+                      }}
+                    >
+                      {unreadNotifications.length > 99
+                        ? '99+'
+                        : unreadNotifications.length}
+                    </span>
+                  )}
+                </button>
+
+                {/* Notification Panel */}
+                {isNotificationOpen && (
+                  <div
+                    style={{
+                      position: 'absolute',
+                      top: '54px',
+                      right: 0,
+                      width: '340px',
+                      maxWidth: '85vw',
+                      background: '#ffffff',
+                      border: '1px solid #e2e8f0',
+                      borderRadius: '12px',
+                      boxShadow: '0 10px 30px rgba(0,0,0,0.12)',
+                      zIndex: 1000,
+                      overflow: 'hidden',
+                    }}
+                  >
+                    <div
+                      style={{
+                        padding: '16px',
+                        display: 'flex',
+                        justifyContent: 'space-between',
+                        alignItems: 'center',
+                        borderBottom: '1px solid #e5e7eb',
+                      }}
+                    >
+                      <div>
+                        <strong style={{ fontSize: '16px' }}>
+                          Notifications
+                        </strong>
+                        <p
+                          style={{
+                            color: '#64748b',
+                            fontSize: '12px',
+                            marginTop: '4px',
+                          }}
+                        >
+                          {unreadNotifications.length} unread
+                        </p>
+                      </div>
+
+                      {unreadNotifications.length > 0 && (
+                        <button
+                          type="button"
+                          onClick={handleMarkAllRead}
+                          style={{
+                            border: 'none',
+                            background: 'none',
+                            color: '#4f46e5',
+                            cursor: 'pointer',
+                            fontSize: '12px',
+                            fontWeight: 600,
+                          }}
+                        >
+                          Mark all read
+                        </button>
+                      )}
+                    </div>
+
+                    <div
+                      style={{
+                        maxHeight: '350px',
+                        overflowY: 'auto',
+                      }}
+                    >
+                      {roleNotifications.length > 0 ? (
+                        roleNotifications.map((notification) => (
+                          <button
+                            type="button"
+                            key={notification.id}
+                            onClick={() =>
+                              handleNotificationClick(notification)
+                            }
+                            style={{
+                              display: 'block',
+                              width: '100%',
+                              textAlign: 'left',
+                              padding: '14px 16px',
+                              border: 'none',
+                              borderBottom: '1px solid #f1f5f9',
+                              background: notification.read
+                                ? '#ffffff'
+                                : '#eef2ff',
+                              cursor: 'pointer',
+                            }}
+                          >
+                            <div
+                              style={{
+                                display: 'flex',
+                                gap: '9px',
+                                alignItems: 'flex-start',
+                              }}
+                            >
+                              <span style={{ fontSize: '18px' }}>
+                                {notification.read ? '📩' : '🔵'}
+                              </span>
+
+                              <div style={{ flex: 1 }}>
+                                <p
+                                  style={{
+                                    fontSize: '13px',
+                                    color: '#1e293b',
+                                    lineHeight: 1.5,
+                                    fontWeight: notification.read
+                                      ? 400
+                                      : 600,
+                                  }}
+                                >
+                                  {notification.message}
+                                </p>
+
+                                <small
+                                  style={{
+                                    display: 'block',
+                                    marginTop: '6px',
+                                    color: '#64748b',
+                                    fontSize: '11px',
+                                  }}
+                                >
+                                  {notification.date}
+                                </small>
+                              </div>
+                            </div>
+                          </button>
+                        ))
+                      ) : (
+                        <div
+                          style={{
+                            padding: '30px 15px',
+                            textAlign: 'center',
+                            color: '#64748b',
+                            fontSize: '13px',
+                          }}
+                        >
+                          <div style={{ fontSize: '28px' }}>🔔</div>
+                          <p style={{ marginTop: '8px' }}>
+                            No notifications yet.
+                          </p>
+                        </div>
+                      )}
+                    </div>
+                  </div>
+                )}
+              </div>
+
+              <div className="header-profile">
+                <div className="avatar">
+                  {isMentor ? 'M' : 'I'}
+                </div>
+                <span>
+                  {isMentor ? 'Demo Mentor' : 'Intern User'}
+                </span>
+              </div>
             </div>
           </header>
 
@@ -510,7 +978,9 @@ function App() {
               <section className="welcome-banner">
                 <div>
                   <h2>Welcome to MentorDesk! 👋</h2>
-                  <p>Ask questions, connect with mentors, and grow your skills.</p>
+                  <p>
+                    Ask questions, connect with mentors, and grow your skills.
+                  </p>
                 </div>
                 <div className="welcome-icon">🎓</div>
               </section>
@@ -522,24 +992,37 @@ function App() {
                   <h2>{questions.length}</h2>
                   <small>All your submitted questions</small>
                 </div>
+
                 <div className="stat-card">
                   <div className="stat-icon orange">◷</div>
                   <p>Open</p>
-                  <h2>{questions.filter((question) => question.status === 'Open').length}</h2>
+                  <h2>
+                    {questions.filter(
+                      (question) => question.status === 'Open'
+                    ).length}
+                  </h2>
                   <small>Waiting for mentor review</small>
                 </div>
+
                 <div className="stat-card">
                   <div className="stat-icon blue">◉</div>
                   <p>In Review</p>
-                  <h2>{questions.filter((question) => question.status === 'In Review').length}</h2>
+                  <h2>
+                    {questions.filter(
+                      (question) => question.status === 'In Review'
+                    ).length}
+                  </h2>
                   <small>Currently being reviewed</small>
                 </div>
+
                 <div className="stat-card">
                   <div className="stat-icon green">✓</div>
                   <p>Answered</p>
                   <h2>
                     {questions.filter(
-                      (question) => question.status === 'Answered' || question.status === 'Resolved'
+                      (question) =>
+                        question.status === 'Answered' ||
+                        question.status === 'Resolved'
                     ).length}
                   </h2>
                   <small>Responses received</small>
@@ -552,10 +1035,15 @@ function App() {
                     <h2>Recent Questions</h2>
                     <p>Track the progress of your questions.</p>
                   </div>
-                  <button className="primary-button" onClick={() => setCurrentPage('submit')}>
+
+                  <button
+                    className="primary-button"
+                    onClick={() => setCurrentPage('submit')}
+                  >
                     + Ask a Question
                   </button>
                 </div>
+
                 {renderQuestions()}
               </section>
             </>
@@ -567,7 +1055,9 @@ function App() {
               <section className="welcome-banner">
                 <div>
                   <h2>Welcome, Mentor! 👋</h2>
-                  <p>Review intern questions, share your knowledge, and support their learning.</p>
+                  <p>
+                    Review intern questions, share your knowledge, and support their learning.
+                  </p>
                 </div>
                 <div className="welcome-icon">🎓</div>
               </section>
@@ -579,24 +1069,37 @@ function App() {
                   <h2>{questions.length}</h2>
                   <small>Questions submitted by interns</small>
                 </div>
+
                 <div className="stat-card">
                   <div className="stat-icon orange">◷</div>
                   <p>Open</p>
-                  <h2>{questions.filter((question) => question.status === 'Open').length}</h2>
+                  <h2>
+                    {questions.filter(
+                      (question) => question.status === 'Open'
+                    ).length}
+                  </h2>
                   <small>Waiting for review</small>
                 </div>
+
                 <div className="stat-card">
                   <div className="stat-icon blue">◉</div>
                   <p>In Review</p>
-                  <h2>{questions.filter((question) => question.status === 'In Review').length}</h2>
+                  <h2>
+                    {questions.filter(
+                      (question) => question.status === 'In Review'
+                    ).length}
+                  </h2>
                   <small>Under review</small>
                 </div>
+
                 <div className="stat-card">
                   <div className="stat-icon green">✓</div>
                   <p>Answered</p>
                   <h2>
                     {questions.filter(
-                      (question) => question.status === 'Answered' || question.status === 'Resolved'
+                      (question) =>
+                        question.status === 'Answered' ||
+                        question.status === 'Resolved'
                     ).length}
                   </h2>
                   <small>Responses submitted</small>
@@ -607,9 +1110,12 @@ function App() {
                 <div className="section-heading">
                   <div>
                     <h2>All Intern Questions</h2>
-                    <p>Search, filter, and select a question to respond.</p>
+                    <p>
+                      Search, filter, and select a question to respond.
+                    </p>
                   </div>
                 </div>
+
                 {renderQuestions()}
               </section>
             </>
@@ -621,11 +1127,16 @@ function App() {
               <div className="section-heading">
                 <div>
                   <h2>Ask a New Question</h2>
-                  <p>Provide details so your mentor can help you.</p>
+                  <p>
+                    Provide details so your mentor can help you.
+                  </p>
                 </div>
               </div>
 
-              <form className="question-form" onSubmit={handleQuestionSubmit}>
+              <form
+                className="question-form"
+                onSubmit={handleQuestionSubmit}
+              >
                 <div className="form-group">
                   <label htmlFor="title">Question Title</label>
                   <input
@@ -637,9 +1148,14 @@ function App() {
                     maxLength="120"
                   />
                 </div>
+
                 <div className="form-group">
                   <label htmlFor="category">Category</label>
-                  <select id="category" name="category" required>
+                  <select
+                    id="category"
+                    name="category"
+                    required
+                  >
                     <option value="">Select a category</option>
                     <option value="Programming">Programming</option>
                     <option value="Web Development">Web Development</option>
@@ -648,8 +1164,11 @@ function App() {
                     <option value="Other">Other</option>
                   </select>
                 </div>
+
                 <div className="form-group">
-                  <label htmlFor="description">Question Description</label>
+                  <label htmlFor="description">
+                    Question Description
+                  </label>
                   <textarea
                     id="description"
                     name="description"
@@ -659,28 +1178,46 @@ function App() {
                     minLength="10"
                   />
                 </div>
+
                 <div className="question-form-actions">
-                  <button type="button" className="secondary-button" onClick={goToRoleDashboard}>
+                  <button
+                    type="button"
+                    className="secondary-button"
+                    onClick={goToRoleDashboard}
+                  >
                     Cancel
                   </button>
-                  <button type="submit" className="primary-button">Submit Question</button>
+
+                  <button
+                    type="submit"
+                    className="primary-button"
+                  >
+                    Submit Question
+                  </button>
                 </div>
               </form>
             </section>
           )}
 
-          {/* INTERN MY QUESTIONS */}
+          {/* MY QUESTIONS */}
           {currentPage === 'myQuestions' && !isMentor && (
             <section className="questions-section">
               <div className="section-heading">
                 <div>
                   <h2>My Submitted Questions</h2>
-                  <p>You have submitted {questions.length} questions.</p>
+                  <p>
+                    You have submitted {questions.length} questions.
+                  </p>
                 </div>
-                <button className="primary-button" onClick={() => setCurrentPage('submit')}>
+
+                <button
+                  className="primary-button"
+                  onClick={() => setCurrentPage('submit')}
+                >
                   + Ask a Question
                 </button>
               </div>
+
               {renderQuestions()}
             </section>
           )}
@@ -697,7 +1234,14 @@ function App() {
                       : 'View your complete question information.'}
                   </p>
                 </div>
-                <div style={{ display: 'flex', gap: '10px', flexWrap: 'wrap' }}>
+
+                <div
+                  style={{
+                    display: 'flex',
+                    gap: '10px',
+                    flexWrap: 'wrap',
+                  }}
+                >
                   {!isMentor && (
                     <button
                       type="button"
@@ -707,11 +1251,14 @@ function App() {
                       Edit Question
                     </button>
                   )}
+
                   {!isMentor && (
                     <button
                       type="button"
                       className="secondary-button"
-                      onClick={() => handleDeleteQuestion(selectedQuestion.id)}
+                      onClick={() =>
+                        handleDeleteQuestion(selectedQuestion.id)
+                      }
                       style={{
                         color: '#dc2626',
                         borderColor: '#fecaca',
@@ -721,23 +1268,36 @@ function App() {
                       Delete Question
                     </button>
                   )}
-                  <button className="secondary-button" onClick={goToRoleDashboard}>
+
+                  <button
+                    className="secondary-button"
+                    onClick={goToRoleDashboard}
+                  >
                     ← Back to Dashboard
                   </button>
                 </div>
               </div>
 
+              {/* EDIT QUESTION */}
               {isEditingQuestion && !isMentor ? (
                 <section className="question-details-card">
                   <div className="section-heading">
                     <div>
                       <h2>Edit Your Question</h2>
-                      <p>Update the title, category, or description.</p>
+                      <p>
+                        Update the title, category, or description.
+                      </p>
                     </div>
                   </div>
-                  <form className="question-form" onSubmit={handleEditQuestionSubmit}>
+
+                  <form
+                    className="question-form"
+                    onSubmit={handleEditQuestionSubmit}
+                  >
                     <div className="form-group">
-                      <label htmlFor="edit-title">Question Title</label>
+                      <label htmlFor="edit-title">
+                        Question Title
+                      </label>
                       <input
                         type="text"
                         id="edit-title"
@@ -748,8 +1308,11 @@ function App() {
                         required
                       />
                     </div>
+
                     <div className="form-group">
-                      <label htmlFor="edit-category">Category</label>
+                      <label htmlFor="edit-category">
+                        Category
+                      </label>
                       <select
                         id="edit-category"
                         name="category"
@@ -763,8 +1326,11 @@ function App() {
                         <option value="Other">Other</option>
                       </select>
                     </div>
+
                     <div className="form-group">
-                      <label htmlFor="edit-description">Question Description</label>
+                      <label htmlFor="edit-description">
+                        Question Description
+                      </label>
                       <textarea
                         id="edit-description"
                         name="description"
@@ -775,6 +1341,7 @@ function App() {
                         required
                       />
                     </div>
+
                     <div className="question-form-actions">
                       <button
                         type="button"
@@ -783,17 +1350,27 @@ function App() {
                       >
                         Cancel
                       </button>
-                      <button type="submit" className="primary-button">Save Changes</button>
+
+                      <button
+                        type="submit"
+                        className="primary-button"
+                      >
+                        Save Changes
+                      </button>
                     </div>
                   </form>
                 </section>
               ) : (
                 <div className="question-details-card">
                   <div className="details-top">
-                    <span className="details-label">QUESTION TITLE</span>
+                    <span className="details-label">
+                      QUESTION TITLE
+                    </span>
+
                     <span
                       className={`status ${
-                        selectedQuestion.status === 'Answered' || selectedQuestion.status === 'Resolved'
+                        selectedQuestion.status === 'Answered' ||
+                        selectedQuestion.status === 'Resolved'
                           ? 'answered'
                           : selectedQuestion.status === 'In Review'
                             ? 'review'
@@ -811,6 +1388,7 @@ function App() {
                       <small>Category</small>
                       <strong>{selectedQuestion.category}</strong>
                     </div>
+
                     <div>
                       <small>Submission Date</small>
                       <strong>{selectedQuestion.date}</strong>
@@ -829,12 +1407,20 @@ function App() {
                         <span className="response-icon">✦</span>
                         <div>
                           <h3>Submit Your Response</h3>
-                          <p>Write an answer and feedback for the intern.</p>
+                          <p>
+                            Write an answer and feedback for the intern.
+                          </p>
                         </div>
                       </div>
-                      <form className="question-form" onSubmit={handleMentorResponse}>
+
+                      <form
+                        className="question-form"
+                        onSubmit={handleMentorResponse}
+                      >
                         <div className="form-group">
-                          <label htmlFor="answer">Mentor Answer</label>
+                          <label htmlFor="answer">
+                            Mentor Answer
+                          </label>
                           <textarea
                             id="answer"
                             name="answer"
@@ -844,8 +1430,11 @@ function App() {
                             required
                           />
                         </div>
+
                         <div className="form-group">
-                          <label htmlFor="feedback">Feedback for Intern</label>
+                          <label htmlFor="feedback">
+                            Feedback for Intern
+                          </label>
                           <textarea
                             id="feedback"
                             name="feedback"
@@ -854,8 +1443,11 @@ function App() {
                             defaultValue={selectedQuestion.feedback}
                           />
                         </div>
+
                         <div className="form-group">
-                          <label htmlFor="status">Update Question Status</label>
+                          <label htmlFor="status">
+                            Update Question Status
+                          </label>
                           <select
                             id="status"
                             name="status"
@@ -872,41 +1464,63 @@ function App() {
                             <option value="Resolved">Resolved</option>
                           </select>
                         </div>
+
                         <div className="question-form-actions">
-                          <button type="button" className="secondary-button" onClick={goToRoleDashboard}>
+                          <button
+                            type="button"
+                            className="secondary-button"
+                            onClick={goToRoleDashboard}
+                          >
                             Cancel
                           </button>
-                          <button type="submit" className="primary-button">Submit Response</button>
+
+                          <button
+                            type="submit"
+                            className="primary-button"
+                          >
+                            Submit Response
+                          </button>
                         </div>
                       </form>
                     </div>
                   ) : (
                     <>
+                      {/* INTERN VIEW OF MENTOR ANSWER */}
                       <div className="mentor-response-section">
                         <div className="response-heading">
                           <span className="response-icon">✦</span>
                           <div>
                             <h3>Mentor Answer</h3>
-                            <p>Response from your assigned mentor</p>
+                            <p>
+                              Response from your assigned mentor
+                            </p>
                           </div>
                         </div>
+
                         {selectedQuestion.answer ? (
                           <div className="mentor-answer">
                             <div className="mentor-name">
                               <div className="avatar">M</div>
                               <div>
-                                <strong>{selectedQuestion.mentor || 'Mentor'}</strong>
+                                <strong>
+                                  {selectedQuestion.mentor || 'Mentor'}
+                                </strong>
                                 <small>Assigned Mentor</small>
                               </div>
                             </div>
+
                             <p>{selectedQuestion.answer}</p>
                           </div>
                         ) : (
                           <div className="waiting-response">
                             <span>◷</span>
                             <div>
-                              <strong>Waiting for mentor response</strong>
-                              <p>Your mentor has not submitted an answer yet.</p>
+                              <strong>
+                                Waiting for mentor response
+                              </strong>
+                              <p>
+                                Your mentor has not submitted an answer yet.
+                              </p>
                             </div>
                           </div>
                         )}
@@ -920,9 +1534,17 @@ function App() {
                       )}
 
                       {selectedQuestion.answer && (
-                        <div className="question-form-actions" style={{ marginTop: '20px' }}>
+                        <div
+                          className="question-form-actions"
+                          style={{ marginTop: '20px' }}
+                        >
                           {selectedQuestion.status === 'Resolved' ? (
-                            <p style={{ color: '#15803d', fontWeight: 600 }}>
+                            <p
+                              style={{
+                                color: '#15803d',
+                                fontWeight: 600,
+                              }}
+                            >
                               ✓ This question has been marked as resolved.
                             </p>
                           ) : (
@@ -939,13 +1561,18 @@ function App() {
                     </>
                   )}
 
-                  {/* FOLLOW-UP DISCUSSION: visible to both Intern and Mentor */}
-                  <div className="mentor-response-section" style={{ marginTop: '24px' }}>
+                  {/* FOLLOW-UP DISCUSSION */}
+                  <div
+                    className="mentor-response-section"
+                    style={{ marginTop: '24px' }}
+                  >
                     <div className="response-heading">
                       <span className="response-icon">💬</span>
                       <div>
                         <h3>Follow-up Discussion</h3>
-                        <p>Discuss this question with the intern or mentor.</p>
+                        <p>
+                          Discuss this question with the intern or mentor.
+                        </p>
                       </div>
                     </div>
 
@@ -972,25 +1599,43 @@ function App() {
                               }}
                             >
                               <strong>{comment.author}</strong>
+
                               <small style={{ color: '#64748b' }}>
                                 {comment.role} · {comment.date}
                               </small>
                             </div>
-                            <p style={{ lineHeight: 1.6, whiteSpace: 'pre-wrap' }}>
+
+                            <p
+                              style={{
+                                lineHeight: 1.6,
+                                whiteSpace: 'pre-wrap',
+                              }}
+                            >
                               {comment.text}
                             </p>
                           </div>
                         ))
                       ) : (
-                        <p style={{ color: '#64748b', marginBottom: '16px' }}>
+                        <p
+                          style={{
+                            color: '#64748b',
+                            marginBottom: '16px',
+                          }}
+                        >
                           No comments yet. Start the discussion!
                         </p>
                       )}
                     </div>
 
-                    <form className="question-form" onSubmit={handleAddComment}>
+                    <form
+                      className="question-form"
+                      onSubmit={handleAddComment}
+                    >
                       <div className="form-group">
-                        <label htmlFor="discussion-comment">Write a Comment</label>
+                        <label htmlFor="discussion-comment">
+                          Write a Comment
+                        </label>
+
                         <textarea
                           id="discussion-comment"
                           name="comment"
@@ -1001,8 +1646,12 @@ function App() {
                           maxLength="1000"
                         />
                       </div>
+
                       <div className="question-form-actions">
-                        <button type="submit" className="primary-button">
+                        <button
+                          type="submit"
+                          className="primary-button"
+                        >
                           Post Comment
                         </button>
                       </div>
@@ -1028,7 +1677,10 @@ function App() {
         </div>
 
         <div className="login-card">
-          <h2>{isSignUp ? 'Create Your Account' : 'Welcome Back!'}</h2>
+          <h2>
+            {isSignUp ? 'Create Your Account' : 'Welcome Back!'}
+          </h2>
+
           <p className="login-subtitle">
             {isSignUp
               ? 'Join MentorDesk and start your learning journey.'
@@ -1048,6 +1700,7 @@ function App() {
                 />
               </div>
             )}
+
             <div className="form-group">
               <label htmlFor="email">Email Address</label>
               <input
@@ -1058,6 +1711,7 @@ function App() {
                 required
               />
             </div>
+
             <div className="form-group">
               <label htmlFor="password">Password</label>
               <input
@@ -1069,9 +1723,12 @@ function App() {
                 required
               />
             </div>
+
             {isSignUp && (
               <div className="form-group">
-                <label htmlFor="confirmPassword">Confirm Password</label>
+                <label htmlFor="confirmPassword">
+                  Confirm Password
+                </label>
                 <input
                   type="password"
                   id="confirmPassword"
@@ -1082,30 +1739,46 @@ function App() {
                 />
               </div>
             )}
+
             <div className="form-group">
               <label htmlFor="role">Account Type</label>
               <select
                 id="role"
                 name="role"
                 value={role}
-                onChange={(event) => setRole(event.target.value)}
+                onChange={(event) =>
+                  setRole(event.target.value)
+                }
               >
                 <option value="Intern">Intern</option>
                 <option value="Mentor">Mentor</option>
               </select>
             </div>
-            <button type="submit" className="login-button">
+
+            <button
+              type="submit"
+              className="login-button"
+            >
               {isSignUp ? 'Create Account' : 'Sign In'}
             </button>
           </form>
 
           <div className="auth-switch">
-            {isSignUp ? 'Already have an account?' : "Don't have an account?"}
-            <button type="button" onClick={() => setIsSignUp(!isSignUp)}>
+            {isSignUp
+              ? 'Already have an account?'
+              : "Don't have an account?"}
+
+            <button
+              type="button"
+              onClick={() => setIsSignUp(!isSignUp)}
+            >
               {isSignUp ? 'Sign In' : 'Create Account'}
             </button>
           </div>
-          <p className="login-footer">MentorDesk — Your Learning Support Platform</p>
+
+          <p className="login-footer">
+            MentorDesk — Your Learning Support Platform
+          </p>
         </div>
       </div>
     </div>
