@@ -7,6 +7,7 @@ function App() {
   const [role, setRole] = useState('Intern')
   const [currentPage, setCurrentPage] = useState('auth')
   const [selectedQuestion, setSelectedQuestion] = useState(null)
+  const [isEditingQuestion, setIsEditingQuestion] = useState(false)
 
   // Search and filter states
   const [searchTerm, setSearchTerm] = useState('')
@@ -163,6 +164,38 @@ function App() {
     alert('Your question has been deleted successfully!')
   }
 
+  // Open the selected question in edit mode.
+  const handleStartEditQuestion = () => {
+    setIsEditingQuestion(true)
+  }
+
+  // Save the edited question and keep the other question data unchanged.
+  const handleEditQuestionSubmit = (event) => {
+    event.preventDefault()
+
+    const formData = new FormData(event.currentTarget)
+    const updatedQuestion = {
+      ...selectedQuestion,
+      title: formData.get('title').trim(),
+      category: formData.get('category'),
+      description: formData.get('description').trim(),
+    }
+
+    setQuestions((previousQuestions) =>
+      previousQuestions.map((question) =>
+        question.id === updatedQuestion.id ? updatedQuestion : question
+      )
+    )
+
+    setSelectedQuestion(updatedQuestion)
+    setIsEditingQuestion(false)
+    alert('Your question has been updated successfully!')
+  }
+
+  const handleCancelEditQuestion = () => {
+    setIsEditingQuestion(false)
+  }
+
   const handleMentorResponse = (event) => {
     event.preventDefault()
 
@@ -190,10 +223,12 @@ function App() {
 
   const openQuestionDetails = (question) => {
     setSelectedQuestion(question)
+    setIsEditingQuestion(false)
     setCurrentPage('details')
   }
 
   const goToRoleDashboard = () => {
+    setIsEditingQuestion(false)
     setCurrentPage(
       role === 'Mentor' ? 'mentorDashboard' : 'dashboard'
     )
@@ -733,6 +768,16 @@ function App() {
                     <button
                       type="button"
                       className="secondary-button"
+                      onClick={handleStartEditQuestion}
+                    >
+                      Edit Question
+                    </button>
+                  )}
+
+                  {!isMentor && (
+                    <button
+                      type="button"
+                      className="secondary-button"
                       onClick={() => handleDeleteQuestion(selectedQuestion.id)}
                       style={{
                         color: '#dc2626',
@@ -753,7 +798,77 @@ function App() {
                 </div>
               </div>
 
-              <div className="question-details-card">
+              {isEditingQuestion && !isMentor ? (
+                <section className="question-details-card">
+                  <div className="section-heading">
+                    <div>
+                      <h2>Edit Your Question</h2>
+                      <p>Update the title, category, or description.</p>
+                    </div>
+                  </div>
+
+                  <form
+                    className="question-form"
+                    onSubmit={handleEditQuestionSubmit}
+                  >
+                    <div className="form-group">
+                      <label htmlFor="edit-title">Question Title</label>
+                      <input
+                        type="text"
+                        id="edit-title"
+                        name="title"
+                        defaultValue={selectedQuestion.title}
+                        placeholder="Enter your question title"
+                        maxLength="120"
+                        required
+                      />
+                    </div>
+
+                    <div className="form-group">
+                      <label htmlFor="edit-category">Category</label>
+                      <select
+                        id="edit-category"
+                        name="category"
+                        defaultValue={selectedQuestion.category}
+                        required
+                      >
+                        <option value="Programming">Programming</option>
+                        <option value="Web Development">Web Development</option>
+                        <option value="Database">Database</option>
+                        <option value="Tools">Tools</option>
+                        <option value="Other">Other</option>
+                      </select>
+                    </div>
+
+                    <div className="form-group">
+                      <label htmlFor="edit-description">Question Description</label>
+                      <textarea
+                        id="edit-description"
+                        name="description"
+                        rows="6"
+                        defaultValue={selectedQuestion.description}
+                        placeholder="Explain your question in detail..."
+                        minLength="10"
+                        required
+                      />
+                    </div>
+
+                    <div className="question-form-actions">
+                      <button
+                        type="button"
+                        className="secondary-button"
+                        onClick={handleCancelEditQuestion}
+                      >
+                        Cancel
+                      </button>
+                      <button type="submit" className="primary-button">
+                        Save Changes
+                      </button>
+                    </div>
+                  </form>
+                </section>
+              ) : (
+                <div className="question-details-card">
                 <div className="details-top">
                   <span className="details-label">QUESTION TITLE</span>
 
@@ -909,7 +1024,8 @@ function App() {
                     )}
                   </>
                 )}
-              </div>
+                </div>
+              )}
             </section>
           )}
         </main>
