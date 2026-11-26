@@ -1,5 +1,5 @@
 
-import { useState } from 'react'
+import { useEffect, useState } from 'react'
 import './App.css'
 
 function App() {
@@ -13,43 +13,70 @@ function App() {
   const [statusFilter, setStatusFilter] = useState('All')
   const [categoryFilter, setCategoryFilter] = useState('All')
 
-  const [questions, setQuestions] = useState([
-    {
-      id: 1,
-      title: 'How does React useState work?',
-      category: 'Programming',
-      date: 'Nov 08, 2026',
-      status: 'Answered',
-      description: 'I want to understand the useState hook in React.',
-      answer:
-        'The useState hook is a React Hook that allows functional components to manage state. It returns an array containing the current state value and a function to update that value.',
-      feedback:
-        'Good question! Keep practicing with small React projects to understand state management better.',
-      mentor: 'Demo Mentor',
-    },
-    {
-      id: 2,
-      title: 'Understanding REST API concepts',
-      category: 'Web Development',
-      date: 'Nov 07, 2026',
-      status: 'In Review',
-      description: 'I need help understanding REST APIs.',
-      answer: '',
-      feedback: '',
-      mentor: '',
-    },
-    {
-      id: 3,
-      title: 'How to use Git branches?',
-      category: 'Tools',
-      date: 'Nov 06, 2026',
-      status: 'Open',
-      description: 'How can I create and manage Git branches?',
-      answer: '',
-      feedback: '',
-      mentor: '',
-    },
-  ])
+  // Load saved questions from localStorage when the app starts.
+  // If no saved data exists, use the demo questions below.
+  const [questions, setQuestions] = useState(() => {
+    try {
+      const savedQuestions = localStorage.getItem('mentorDeskQuestions')
+
+      if (savedQuestions) {
+        const parsedQuestions = JSON.parse(savedQuestions)
+
+        if (Array.isArray(parsedQuestions)) {
+          return parsedQuestions
+        }
+      }
+    } catch (error) {
+      console.error('Could not load saved questions:', error)
+    }
+
+    return [
+      {
+        id: 1,
+        title: 'How does React useState work?',
+        category: 'Programming',
+        date: 'Nov 08, 2026',
+        status: 'Answered',
+        description: 'I want to understand the useState hook in React.',
+        answer:
+          'The useState hook is a React Hook that allows functional components to manage state. It returns an array containing the current state value and a function to update that value.',
+        feedback:
+          'Good question! Keep practicing with small React projects to understand state management better.',
+        mentor: 'Demo Mentor',
+      },
+      {
+        id: 2,
+        title: 'Understanding REST API concepts',
+        category: 'Web Development',
+        date: 'Nov 07, 2026',
+        status: 'In Review',
+        description: 'I need help understanding REST APIs.',
+        answer: '',
+        feedback: '',
+        mentor: '',
+      },
+      {
+        id: 3,
+        title: 'How to use Git branches?',
+        category: 'Tools',
+        date: 'Nov 06, 2026',
+        status: 'Open',
+        description: 'How can I create and manage Git branches?',
+        answer: '',
+        feedback: '',
+        mentor: '',
+      },
+    ]
+  })
+
+  // Save questions whenever the questions state changes.
+  useEffect(() => {
+    try {
+      localStorage.setItem('mentorDeskQuestions', JSON.stringify(questions))
+    } catch (error) {
+      console.error('Could not save questions:', error)
+    }
+  }, [questions])
 
   const handleSubmit = (event) => {
     event.preventDefault()
