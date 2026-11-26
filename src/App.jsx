@@ -221,6 +221,32 @@ function App() {
     alert('Your response has been submitted successfully!')
   }
 
+  // Allow an intern to mark a question as resolved after receiving an answer.
+  const handleMarkAsResolved = () => {
+    if (!selectedQuestion || !selectedQuestion.answer) return
+    if (selectedQuestion.status === 'Resolved') return
+
+    const shouldResolve = window.confirm(
+      'Have you reviewed the mentor answer? Mark this question as resolved?'
+    )
+
+    if (!shouldResolve) return
+
+    const updatedQuestion = {
+      ...selectedQuestion,
+      status: 'Resolved',
+    }
+
+    setQuestions((previousQuestions) =>
+      previousQuestions.map((question) =>
+        question.id === updatedQuestion.id ? updatedQuestion : question
+      )
+    )
+
+    setSelectedQuestion(updatedQuestion)
+    alert('Question marked as resolved successfully!')
+  }
+
   const openQuestionDetails = (question) => {
     setSelectedQuestion(question)
     setIsEditingQuestion(false)
@@ -1020,6 +1046,24 @@ function App() {
                       <div className="mentor-feedback-section">
                         <h3>Mentor Feedback</h3>
                         <p>{selectedQuestion.feedback}</p>
+                      </div>
+                    )}
+
+                    {selectedQuestion.answer && (
+                      <div className="question-form-actions" style={{ marginTop: '20px' }}>
+                        {selectedQuestion.status === 'Resolved' ? (
+                          <p style={{ color: '#15803d', fontWeight: 600 }}>
+                            ✓ This question has been marked as resolved.
+                          </p>
+                        ) : (
+                          <button
+                            type="button"
+                            className="primary-button"
+                            onClick={handleMarkAsResolved}
+                          >
+                            Mark as Resolved
+                          </button>
+                        )}
                       </div>
                     )}
                   </>
